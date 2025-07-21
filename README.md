@@ -57,7 +57,7 @@
 
 ## ✍️ 更多细节与教程
 
-更完整的原理解析、部署细节以及运维心路历程，都已整理在博客文章中：[👉（文章链接占位，后续补充）](https://blog.tangwudi.com/technology/homedatacenter13504/)
+更完整的原理解析、部署细节以及运维心路历程，都已整理在博客文章中：[https://blog.tangwudi.com/technology/homedatacenter13504/]
 
 ---
 
