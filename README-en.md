@@ -86,7 +86,7 @@ Because this is a read-heavy personal blog, not an e-commerce or SaaS app.
 ## 🔗 Related blog posts
 
 Will link here once published.
-Meanwhile, more articles at https://blog.tangwudi.com.
+Meanwhile, more articles at https://blog.tangwudi.com/en/technology/homedatacenter13504/.
 
 ⸻
 
