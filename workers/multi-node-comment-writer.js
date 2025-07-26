@@ -24,58 +24,75 @@
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
- 
-    // 如果路径不是 /admin-ajax.php，返回 404（防止滥用）
-    if (!url.pathname.endsWith("/admin-ajax.php")) {
+
+    // 只处理 /wp-admin/admin-ajax.php
+    if (url.pathname !== "/wp-admin/admin-ajax.php") {
       return new Response("Not found", {
         status: 404,
         headers: {
           "content-type": "text/plain",
-          "X-Worker-Hit": "no" // 自定义响应头，用于标记未命中
+          "X-Worker-Hit": "no"
         }
       });
     }
- 
-    // 缓冲请求体（避免多次读取失败）
-    const reqBody = request.method === "GET" || request.method === "HEAD"
-      ? null
-      : await request.arrayBuffer();
- 
-    // 拷贝请求头，去除 Referer（有些服务会校验）
+
+    // 仅处理 POST 且为提交评论请求
+    if (request.method !== "POST") {
+      return fetch(request); // 放行非 POST（如 GET, OPTIONS）
+    }
+
+    // 读取请求体（可复用）
+    const reqBody = await request.arrayBuffer();
+    const contentType = request.headers.get("content-type") || "";
+
+    let isCommentRequest = false;
+
+    // 判断是否为评论提交请求
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+      try {
+        const bodyText = new TextDecoder().decode(reqBody);
+        const params = new URLSearchParams(bodyText);
+        isCommentRequest = params.has("comment_post_ID") && params.has("comment");
+      } catch (err) {
+        console.log("Body parse failed:", err);
+      }
+    }
+
+    // 如果不是评论请求，直接原样转发（可能是后台 AJAX 请求）
+    if (!isCommentRequest) {
+      return fetch(request);
+    }
+
+    // ========= 评论请求正式处理 =========
+
     const commonHeaders = new Headers(request.headers);
     commonHeaders.delete("referer");
- 
-    // 构建主节点请求（comment1：macmini 上的主写节点）
+
     const primaryRequest = new Request("https://comment1.example.com/wp-admin/admin-ajax.php", {
-      method: request.method,
-      headers: commonHeaders,
-      body: reqBody,
-      redirect: "manual" // 防止重定向被自动跟随
-    });
- 
-    // 构建从节点请求（comment2：芝加哥从读节点）
-    const secondaryRequest = new Request("https://comment2.example.com/wp-admin/admin-ajax.php", {
-      method: request.method,
+      method: "POST",
       headers: commonHeaders,
       body: reqBody,
       redirect: "manual"
     });
- 
-    // 主节点请求：同步执行，并作为最终响应返回
+
+    const secondaryRequest = new Request("https://comment2.example.com/wp-admin/admin-ajax.php", {
+      method: "POST",
+      headers: commonHeaders,
+      body: reqBody,
+      redirect: "manual"
+    });
+
     const primaryResponse = await fetch(primaryRequest);
- 
-    // 从节点请求：异步执行，失败也不会影响主流程
+
     ctx.waitUntil(
       fetch(secondaryRequest).catch((err) => {
         console.log("Secondary write failed:", err);
       })
     );
- 
-    // 添加自定义响应头，标记命中 Worker
+
     const respHeaders = new Headers(primaryResponse.headers);
     respHeaders.set("X-Worker-Hit", "yes");
- 
-    // 返回主节点的响应结果
+
     return new Response(primaryResponse.body, {
       status: primaryResponse.status,
       statusText: primaryResponse.statusText,
